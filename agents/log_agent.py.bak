@@ -179,28 +179,3 @@ def run_agent(query, verbose=False):
                 return parts[-1].strip()
         return output.strip()
     return str(result).strip()
-
-
-def analyze_log_content(prompt_text):
-    """
-    【新模式】直接分析传入的日志文本，不调用任何外部工具。
-    解决 Agent 工具调用失败和死循环问题。
-    """
-    llm = get_qwen_llm()
-    
-    # 定义一个简单的 Prompt 模板，不需要工具描述
-    simple_prompt = ChatPromptTemplate.from_messages([
-        ("system", "你是一个专业的 AI 安全日志分析助手。你的任务是分析用户提供的日志文本，并直接输出结构化的安全报告。不要输出任何中间思考过程。"),
-        ("human", "{input}"),
-    ])
-    
-    chain = simple_prompt | llm
-    
-    print("🚀 正在分析日志内容 (静默模式)...")
-    
-    response = chain.invoke({"input": prompt_text})
-    
-    # 提取内容
-    if hasattr(response, 'content'):
-        return response.content
-    return str(response)

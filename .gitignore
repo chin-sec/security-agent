@@ -56,3 +56,5 @@ datasets/
 models/
 weights/
 .env
+chroma_db/*.sqlite3
+*.bak
