@@ -1,0 +1,30 @@
+# 忽略虚拟环境 (最重要！)
+agent-env/
+venv/
+.env/
+*.egg-info/
+
+# 忽略 Git 目录
+.git/
+.gitignore
+
+# 忽略大型数据文件和日志 (这些通过挂载卷进入容器)
+data/
+reports/
+logs/
+*.log
+chroma_db/
+
+# 忽略 Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# 忽略 IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo

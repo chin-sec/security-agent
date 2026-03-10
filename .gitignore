@@ -1,61 +1,24 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environments (关键！你的环境目录)
-env/
-venv/
-ENV/
-agent-env/
-lsagent-env/
-test_env/
-.pytest_cache/
-.coverage
-htmlcov/
-
-# IDE & OS
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# AI/ML & Data (关键！忽略模型和数据集)
-*.pth
-*.pt
-*.bin
-*.onnx
-*.h5
-*.pb
-*.tflite
-*.ckpt
-*.safetensors
-*.log
-data/
-datasets/
-models/
-weights/
+# 敏感信息
 .env
-chroma_db/*.sqlite3
-*.bak
-reports/
+*.key
+secrets.json
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 虚拟环境
+agent-env/
+venv/
+
+# 数据文件 (用户数据不应上传)
+data/*
+reports/*
+!data/.gitkeep
+!reports/.gitkeep
+
+# Docker 构建产物
+*.log
+chroma_db/
