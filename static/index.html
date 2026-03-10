@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ 安全日志 AI 分析器</title>
+    <!-- 引入 Tailwind CSS 进行快速美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Marked.js 用于渲染 Markdown 结果 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 引入 FontAwesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .loader {
+            border-top-color: #3B82F6;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Markdown 样式微调 */
+        .prose h1 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; color: #1e3a8a; }
+        .prose h2 { font-size: 1.25em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: #1e40af; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .prose p { margin-bottom: 1em; line-height: 1.6; }
+        .prose code { background-color: #f3f4f6; padding: 0.2em 0.4em; border-radius: 4px; font-family: monospace; color: #d946ef; }
+        .prose pre { background-color: #1f2937; color: #f3f4f6; padding: 1em; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
+        .prose blockquote { border-left: 4px solid #3B82F6; padding-left: 1em; color: #4b5563; font-style: italic; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg shadow-lg">
+                    <i class="fa-solid fa-shield-halved fa-lg"></i>
+                </div>
+                <h1 class="text-xl font-bold text-slate-800 tracking-tight">安全日志 AI 分析器</h1>
+            </div>
+            <div class="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
+                Powered by CrewAI & Qwen
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-10 max-w-3xl">
+        
+        <!-- 介绍卡片 -->
+        <div class="text-center mb-10">
+            <h2 class="text-3xl font-extrabold text-slate-900 mb-3">智能威胁检测</h2>
+            <p class="text-slate-600 text-lg">上传您的服务器日志 (.log, .txt)，AI 将自动分析潜在的攻击行为、异常流量及安全漏洞。</p>
+        </div>
+
+        <!-- 上传区域 -->
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <div class="p-8">
+                <form id="uploadForm" class="space-y-6">
+                    <!-- 文件拖拽区 -->
+                    <div class="relative group">
+                        <input type="file" id="fileInput" name="file" accept=".log,.txt" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" required>
+                        <div class="border-2 border-dashed border-slate-300 rounded-xl p-10 text-center group-hover:border-blue-500 group-hover:bg-blue-50 transition-all duration-300">
+                            <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-400 group-hover:text-blue-500 mb-4 transition-colors"></i>
+                            <p class="text-lg font-medium text-slate-700">点击或拖拽文件至此</p>
+                            <p class="text-sm text-slate-500 mt-2">支持 .log, .txt 格式 (最大 50MB)</p>
+                            <p id="fileName" class="text-sm font-bold text-blue-600 mt-3 hidden"></p>
+                        </div>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                        <span>开始深度分析</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- 加载状态 -->
+            <div id="loadingState" class="hidden bg-slate-50 p-8 text-center border-t border-slate-100">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-200 h-12 w-12 mb-4 mx-auto"></div>
+                <h3 class="text-lg font-semibold text-slate-700">AI 正在阅读日志...</h3>
+                <p class="text-slate-500 text-sm mt-2">这可能需要几十秒，请勿关闭页面</p>
+            </div>
+
+            <!-- 结果展示区 -->
+            <div id="resultArea" class="hidden border-t border-slate-100">
+                <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+                    <h3 class="font-bold text-green-400"><i class="fa-solid fa-check-circle mr-2"></i>分析完成</h3>
+                    <button onclick="document.getElementById('resultArea').classList.add('hidden'); document.getElementById('uploadForm').classList.remove('hidden');" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded transition">
+                        关闭
+                    </button>
+                </div>
+                <div class="p-8 bg-white prose prose-slate max-w-none" id="markdownOutput">
+                    <!-- Markdown 内容将渲染在这里 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 作者署名 -->
+        <div class="mt-12 text-center">
+            <p class="text-slate-400 text-sm">
+                Developed with ❤️ by <span class="font-bold text-slate-600">Chin-sec</span>
+            </p>
+            <p class="text-slate-300 text-xs mt-1">Security Agent v2.0 • Internal Use Only</p>
+        </div>
+
+    </main>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileName');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingState = document.getElementById('loadingState');
+        const resultArea = document.getElementById('resultArea');
+        const markdownOutput = document.getElementById('markdownOutput');
+
+        // 显示选中的文件名
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fileNameDisplay.textContent = `已选择: ${e.target.files[0].name}`;
+                fileNameDisplay.classList.remove('hidden');
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) return alert("请选择一个文件");
+
+            // UI 状态切换
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 分析中...';
+            loadingState.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || '分析失败');
+                }
+
+                const textResult = await response.text();
+                
+                // 渲染 Markdown
+                markdownOutput.innerHTML = marked.parse(textResult);
+                
+                // 显示结果
+                loadingState.classList.add('hidden');
+                resultArea.classList.remove('hidden');
+                form.classList.add('hidden'); // 隐藏表单，专注看结果
+
+            } catch (error) {
+                alert(`发生错误: ${error.message}`);
+                loadingState.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> <span>开始深度分析</span>';
+            }
+        });
+    </script>
+</body>
+</html>
