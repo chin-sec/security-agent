@@ -1,59 +1,57 @@
-# tools/retrieval_tools.py
 import os
-import chromadb
-from sentence_transformers import SentenceTransformer
+from typing import Optional, Type
+from langchain_core.tools import tool  # 【关键】必须从 langchain_core 导入
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings # 假设你用的是 HF Embeddings
 
-# --- 全局单例配置 (避免每次调用都重载) ---
-MODEL_NAME = 'BAAI/bge-small-zh-v1.5' # 必须与 build_vector_db.py 一致
-DB_PATH = './chroma_db'
-COLLECTION_NAME = "security_knowledge"
+# 配置嵌入模型 (请根据你实际使用的模型调整，这里假设是 text2vec)
+# 如果你的 build_vector_db.py 用的是其他模型，请保持一致
+EMBEDDING_MODEL_NAME = "shibing624/text2vec-base-chinese" 
+VECTOR_DB_PATH = "chroma_db"
 
-_model = None
-_client = None
-_collection = None
-
-def get_retriever():
-    """懒加载：只在第一次调用时初始化模型和数据库连接"""
-    global _model, _client, _collection
-    
-    if _model is None:
-        try:
-            _model = SentenceTransformer(MODEL_NAME)
-            _client = chromadb.PersistentClient(path=DB_PATH)
-            
-            # 尝试获取集合，如果不存在则返回 None
-            try:
-                _collection = _client.get_collection(name=COLLECTION_NAME)
-            except Exception:
-                _collection = None # 集合不存在
-                
-        except Exception as e:
-            print(f"⚠️  初始化检索器失败: {e}")
-            return None, None
-            
-    return _model, _collection
-
-def retrieve_knowledge(query: str, top_k: int = 3) -> str:
+@tool
+def retrieve_knowledge(query: str) -> str:
     """
-    检索安全知识库
-    如果数据库未构建或查询失败，返回提示信息，不让 Agent 崩溃
+    检索本地安全知识库，获取与查询内容相关的安全规则、防御建议或攻击特征。
+    
+    参数:
+        query (str): 用户想要查询的安全主题，例如 'SSH 爆破防御', 'fail2ban 配置', 'SQL 注入特征'。
+    
+    返回:
+        str: 检索到的相关知识片段，格式为纯文本。如果没有找到相关内容，返回提示信息。
     """
-    model, collection = get_retriever()
-    
-    if collection is None:
-        return "⚠️  安全知识库尚未构建或找不到。请先运行 'python rag/build_vector_db.py' 构建数据库。"
-    
     try:
-        query_emb = model.encode([query]).tolist()
-        results = collection.query(query_embeddings=query_emb, n_results=top_k)
+        if not os.path.exists(VECTOR_DB_PATH):
+            return "Error: Vector database not found. Please run build_vector_db.py first."
+
+        # 初始化 Embeddings
+        # 注意：首次加载模型会下载文件，后续会从缓存读取
+        embeddings = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL_NAME,
+            model_kwargs={'device': 'cpu'}, # 如果有 GPU 可改为 'cuda'
+            encode_kwargs={'normalize_embeddings': True}
+        )
+
+        # 加载向量数据库
+        db = Chroma(
+            persist_directory=VECTOR_DB_PATH,
+            embedding_function=embeddings
+        )
+
+        # 执行检索 (取前 3 个最相关片段)
+        docs = db.similarity_search(query, k=3)
         
-        if not results['documents'] or not results['documents'][0]:
-            return "未找到相关的安全知识。"
-            
-        docs = results['documents'][0]
-        # 格式化输出，让 Agent 更容易理解
-        response = "📚 相关知识库检索结果:\n" + "\n".join([f"- {doc}" for doc in docs])
-        return response
+        if not docs:
+            return "No relevant knowledge found in the database."
+
+        # 格式化输出
+        results = []
+        for i, doc in enumerate(docs):
+            results.append(f"[Source {i+1}]: {doc.page_content}")
         
+        return "\n\n".join(results)
+
     except Exception as e:
-        return f"❌ 检索过程中发生错误: {str(e)}"
+        return f"Error retrieving knowledge: {str(e)}"
+
+__all__ = ["retrieve_knowledge"]

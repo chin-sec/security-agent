@@ -1,82 +1,43 @@
-# tools/log_tools.py
 import os
+from typing import Optional, Type
+from langchain_core.tools import BaseTool, tool  # 【关键】必须从 langchain_core 导入
 
-# 配置：最大允许读取的行数，防止大日志文件撑爆内存或消耗过多 Token
-MAX_LINES_TO_READ = 500 
-
-def read_log_file(filename: str) -> str:
+# --- 方案 A: 使用 @tool 装饰器 (推荐，最简洁) ---
+@tool
+def read_log_file(file_path: str) -> str:
     """
-    安全地读取 data 目录下的日志文件。
+    读取指定路径的日志文件内容。
     
-    功能特点：
-    1. 路径沙箱：强制限制在 data/ 目录下，防止路径遍历攻击。
-    2. 智能路径：自动基于项目根目录解析，不受当前工作目录影响。
-    3. 大文件保护：只读取前 N 行，避免内存溢出。
-    4. 编码容错：优先 UTF-8，失败则尝试 latin-1。
+    参数:
+        file_path (str): 日志文件的绝对或相对路径，例如 'data/auth.log'。
+    
+    返回:
+        str: 文件的完整文本内容。如果文件不存在或读取失败，返回错误信息字符串。
     """
-    
-    # 1. 基础安全检查：文件名不能包含非法字符或上级目录引用
-    if not filename or ".." in filename or filename.startswith("/"):
-        return "❌ 错误：非法的文件名。为了安全，文件名不能包含 '..' 或绝对路径。"
-    
-    # 2. 构建安全路径
-    # 获取当前文件 (log_tools.py) 所在的目录，向上找两级找到项目根目录 (假设结构: project/tools/log_tools.py)
-    # 如果你的结构不同，请调整 os.path.dirname 的次数，或者直接指定绝对路径
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir) # 假设 tools 在项目根目录下
-    base_dir = os.path.join(project_root, "data")
-    
-    # 规范化路径并拼接
-    safe_filename = os.path.basename(filename) # 再次确保只取文件名部分
-    filepath = os.path.join(base_dir, safe_filename)
-    
-    # 3. 二次确认：确保最终路径真的在 data 目录下 (防绕过)
-    real_path = os.path.realpath(filepath)
-    real_base = os.path.realpath(base_dir)
-    
-    if not real_path.startswith(real_base):
-        return "❌ 错误：安全拦截！试图访问 data 目录之外的文件。"
-
-    # 4. 检查文件存在性
-    if not os.path.exists(filepath):
-        # 列出 data 目录下现有的文件，帮助用户调试
-        try:
-            available_files = os.listdir(base_dir)
-            hint = f"当前 data 目录下有: {', '.join(available_files)}" if available_files else "当前 data 目录为空"
-        except:
-            hint = "无法列出 data 目录内容"
-        return f"❌ 错误：找不到文件 '{safe_filename}'。\n💡 {hint}"
-    
-    # 5. 读取文件 (带行数限制和编码容错)
     try:
-        lines = []
-        # 尝试 UTF-8
-        encoding_used = 'utf-8'
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                for i, line in enumerate(f):
-                    if i >= MAX_LINES_TO_READ:
-                        lines.append(f"\n... [已截断，仅显示前 {MAX_LINES_TO_READ} 行，文件过大]")
-                        break
-                    lines.append(line)
-        except UnicodeDecodeError:
-            # 如果 UTF-8 失败，尝试 latin-1 (几乎能读取所有二进制文本而不报错)
-            encoding_used = 'latin-1'
-            with open(filepath, 'r', encoding='latin-1') as f:
-                for i, line in enumerate(f):
-                    if i >= MAX_LINES_TO_READ:
-                        lines.append(f"\n... [已截断，仅显示前 {MAX_LINES_TO_READ} 行，文件过大]")
-                        break
-                    lines.append(line)
+        if not os.path.exists(file_path):
+            return f"Error: File not found at {file_path}"
         
-        content = "".join(lines)
-        warning = ""
-        if len(lines) >= MAX_LINES_TO_READ:
-            warning = f"\n⚠️ 注意：文件较大，已自动截断为前 {MAX_LINES_TO_READ} 行进行分析。如需分析更多内容，请手动拆分日志文件。\n\n"
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
             
-        return f"{warning}(使用编码: {encoding_used})\n{content}"
-        
-    except PermissionError:
-        return f"❌ 错误：没有权限读取文件 {filepath}。"
+        if not content:
+            return "Warning: File is empty."
+            
+        return content
     except Exception as e:
-        return f"❌ 读取文件时发生未知错误：{str(e)}"
+        return f"Error reading file: {str(e)}"
+
+# --- 方案 B: 如果你需要更复杂的自定义工具类 (备选，目前不需要) ---
+# class CustomReadLogTool(BaseTool):
+#     name: str = "read_log_file"
+#     description: str = "读取指定路径的日志文件内容。参数 file_path 是文件路径。"
+#     
+#     def _run(self, file_path: str) -> str:
+#         return read_log_file.invoke({"file_path": file_path})
+#     
+#     def _arun(self, file_path: str):
+#         raise NotImplementedError("Async not supported")
+
+# 导出工具，方便 crew_agents.py 导入
+__all__ = ["read_log_file"]
