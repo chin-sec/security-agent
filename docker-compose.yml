@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  sec-agent:
+    # 构建配置：使用当前目录的 Dockerfile
+    build: .
+    
+    # 容器名称
+    container_name: sec-agent-prod
+    
+    # 端口映射：宿主机 8000 -> 容器 8000
+    ports:
+      - "8000:8000"
+    
+    # 环境变量：自动读取同目录下的 .env 文件
+    env_file:
+      - .env
+    
+    # 额外环境变量 (可选，如果 .env 里没有可以在这补)
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-qwen-max}
+    
+    # 数据卷挂载：确保持久化存储
+    volumes:
+      # 上传的日志文件
+      - ./data:/app/data
+      # 生成的分析报告
+      - ./reports:/app/reports
+      # (可选) 如果你需要持久化 ChromaDB 向量数据库，取消下面这行的注释
+      # - ./chroma_db:/app/chroma_db
+    
+    # 重启策略：容器退出或服务器重启时自动启动
+    restart: unless-stopped
+    
+    # 资源限制 (可选，防止 AI 任务吃光内存导致服务器死机)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
